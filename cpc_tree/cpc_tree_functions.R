@@ -1,3 +1,23 @@
+#######################################################
+#
+# filename: cpc_tree_functions.R
+# author: Jason Bell
+# Created Date: 10/31/2019 HaPpY hAlLOwEEn!
+#
+# Description:
+# The source code containing functions necessary
+# for cpc_tree.R
+# 
+# Input files:
+# NA
+# 
+# Output files: 
+# NA
+# 
+#
+########################################################
+
+
 # write a function that will get the dot level of a symbol, 
 # then create an empty ancestry vector, pass that to the new function
 
