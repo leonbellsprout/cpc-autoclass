@@ -9,8 +9,8 @@
 # from two sources (e.g., machine, contractor)
 # 
 # Input files:
-# CPCSymbolList201908 with parentage.csv (in Repository)
-# Data file (not in Repository)
+# CPCSymbolList201908 with parentage.csv
+# Data file 
 # 
 # Output files:
 # csv file containing distances for each 
@@ -24,6 +24,8 @@
 # call forth any packages
 library(data.table)
 library(ggplot2)
+library(foreach)
+library(doSNOW)
 
 # set working directory
 # choose any file within the directory -- this will only keep the directory not the file
@@ -55,8 +57,22 @@ d.parents$PARENTS_NO_SPACE <- gsub(" ", "", d.parents$parents, fixed = TRUE)
 filename <- file.choose()
 d.same <- data.table(read.csv(filename))
 
+# this dataset has one cpc code from each application id
+# remove these if this is the case and combine with 2nd dataset
+d.same <- d.same[Create.User.Id=="MACHINE"]
+
+# if combining datasets, do so here
+filename2 <- file.choose()
+d.same2 <- data.table(read.csv(filename2, header=FALSE))
+
+d.same
+d.same2
+
 # rename columns 
 names(d.same) <- c("appl_id", "full_symbol_tx", "create_user_id", "allocation_type", "c_star")
+names(d.same2) <- c("appl_id", "create_user_id", "full_symbol_tx", "allocation_type", "c_star")
+
+d.same <- rbind(d.same,d.same2)
 
 # strip whitespace from symbol text
 d.same[,full_symbol_tx := as.character(full_symbol_tx)]
@@ -73,6 +89,9 @@ d.same <- d.same[substring(full_symbol_tx,1,1)!="Y"]
 # create a new column which will create two sources from multiple (as long as one is named "MACHINE")
 d.same[,source := sapply(create_user_id, function(x) if (x=="MACHINE") {"MACHINE"} else {"OTHER"})]
 
+# get rid of applications with < 2 sources
+d.same<-d.same[,nsource:=length(unique(source)),by=appl_id][nsource>1]
+
 # machine is predicting subclass... get rid of any machine symbols 
 # that aren't the full symbol
 # machine predicted around 4300 symbols that aren't full symbols
@@ -81,21 +100,34 @@ d.same <- d.same[grep('/',full_symbol_tx)]
 # sort dataset by application id, source, cpc code
 d.same <- d.same[order(appl_id, source, full_symbol_tx)]
 
+# this dataset has a bunch of dups -- remove them!
+d.same <- unique(d.same, by=c("appl_id", "source", "full_symbol_tx"))
+
+# add application index for keeping track in loop
+d.same[,index:=1:.N]
+
 # examine dataset
 d.same
+
+unique(d.same[,appl_id])[1:20]
+d.same[appl_id==13512421]
+
+#d.same[source=="OTHER"]
 
 # run through function getDistanceDT
 # you will want to run the next 5 lines in case you step away and it finishes
 # before you get back and the computer restartsssss
 # you must have the directory created
-start_time <- Sys.time()
-d.distance.output <- getDistanceDT(d.same) # took 8.5 hours
-end_time <- Sys.time()
-d.output <- cbind(d.same, d.distance.output) 
-write.csv(d.output,"C:\\Files\\Inbox\\R Output Files\\rand_samp_distance_20191029.csv",row.names=FALSE)
+#start_time <- Sys.time()
+d.output <- getDistanceDTNew(d.same) # took 8.5 hours for ~2000 apps
+;#end_time <- Sys.time()
+#d.output <- cbind(d.same, d.distance.output) 
+currentDate <- Sys.Date()
+filename <- paste("C:\\Files\\Inbox\\R Output Files\\rand_samp_distance_",currentDate,".csv",sep="")
+write.csv(d.output,filename,row.names=FALSE)
 
 d.same
-d.distance.output
+#d.distance.output
 d.output
 #d.output.merge <- merge(d.same,d.distance.output,by=c("appl_id","source","full_symbol_tx")) # giving too many rows
 #write.csv(d.output,"difference_matrix.csv", row.names=FALSE)
@@ -118,12 +150,96 @@ p + geom_histogram()
 # merge instead of cbind
 #merge(d.same,d.temp,by=c("appl_id","source","full_symbol_tx"))
 
-d <- d.same[appl_id=="15736129"]
+#d <- d.same[appl_id=="15736129"]
+#d <- d.same[appl_id=="15511761"]
 
-d.output[appl_id=="16326325"]
-d.output[appl_id=="15579374"]
-d.output[appl_id=="15511761"]
+#d.output[appl_id=="16326325"]
+#d.output[appl_id=="15579374"]
+#d.output[appl_id=="15511761"]
 
 #d.output[,avg_distance:=mean(distance),by=list(appl_id, source)]
 #d.output[distance<10000,avg_distance_no_sec:=mean(distance),by=list(appl_id, source)]
 #length(unique(d.output[avg_distance_no_sec<25&source=="OTHER",appl_id]))
+
+
+# see if apply function will work instead of the for loop
+
+start_time <- Sys.time()
+d.two_applications <- d.same[appl_id%in%c(13512421,13993183,15304182)]
+d.two_applications[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.two_applications[source=="OTHER",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+d.two_applications[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.two_applications[source=="MACHINE",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+end_time <- Sys.time()
+print(end_time-start_time)
+
+#d.two_applications <- d.same[appl_id%in%c(13512421,13993183,15304182,)]
+d.two_applications <- d.same[appl_id%in%twenty_apps]
+appl_list <- unique(d.two_applications[,appl_id])
+d.output <- data.table(appl_id=numeric(0), full_symbol_tx=character(0),create_user_id=character(0),allocation_type=character(0), c_star=character(0), source=character(0), nsource=numeric(0), index=numeric(0), distance=numeric(0),lineage=logical(0))
+start_time <- Sys.time()
+for (id in appl_list) {
+	d.one_application <- d.two_applications[appl_id==id]
+	d.one_application[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="OTHER",full_symbol_tx]),by=list(full_symbol_tx)]
+	d.one_application[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="MACHINE",full_symbol_tx]),by=list(full_symbol_tx)]
+	d.output <- rbind(d.output, d.one_application)
+}
+end_time <- Sys.time()
+print(end_time-start_time)
+
+d.one_application <- d.two_applications[appl_id==13512421]
+d.one_application[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="OTHER",full_symbol_tx]),by=list(full_symbol_tx)]
+d.one_application[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="MACHINE",full_symbol_tx]),by=list(full_symbol_tx)]
+rbind(d.output, d.one_application)
+
+# try with more apps
+twenty_apps <- unique(d.same[,appl_id])[1:20]
+d.20apps <- d.same[appl_id%in%twenty_apps]
+
+start_time <- Sys.time()
+d.20apps[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.20apps[source=="OTHER",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+d.20apps[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.20apps[source=="MACHINE",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+end_time <- Sys.time()
+print(end_time-start_time)
+d.20apps[appl_id==13512421]
+# so I think that's going to work!
+
+
+# so there was a giant file that got output in the interim
+# check and see if that can load
+
+# can't read this in -- too big 
+# ah -- I see the problem. I was outputting the entire dataset
+# each iteration, so the file became massive
+# giantDT <- read.csv("C:\\Files\\Inbox\\R Output Files\\distance_function_int_dataset_2019-11-04.csv")
+
+# see if can run faster using more cores?
+#cores <- detectCores()
+#cl <- makeCluster(cores[1]-1)
+#cl <- makeCluster(2)
+#registerDoSNOW(cl)
+start_time <- Sys.time()
+#outputDT <- data.table(appl_id=numeric(0), full_symbol_tx=character(0),create_user_id=character(0),allocation_type=character(0), c_star=character(0), source=character(0), nsource=numeric(0), index=numeric(0), distance=numeric(0),lineage=logical(0))
+	
+	outputDT <- rbindlist(
+	foreach(i=1:20) %dopar% {
+		d.one_application <- d.same[appl_id==twenty_apps[i]]
+		d.one_application[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="OTHER",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+		d.one_application[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="MACHINE",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+
+		#rbind(outputDT,d.one_application)
+
+	}
+	)
+
+
+#myFun2(d.same)
+#stopCluster(cl)
+outputDT
+end_time <- Sys.time()
+print(end_time-start_time)
+
+cl <- makeCluster(2)
+registerDoSNOW(cl)
+foreach(i = 1:3, .combine = 'c') %dopar% {
+  sqrt(i)
+}
+stopCluster(cl)

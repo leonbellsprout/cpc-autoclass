@@ -320,91 +320,252 @@ getDistanceDT <- function(d) {
 	return(d.distance)
 }
 
+# create a more efficient version
+getDistanceDTNew <- function(d) {
+	#require(svMisc)
+	# create an empty data frame to hold distance and lineage values	
+	#d.distance <- data.table(appl_id=numeric(), source=character(),full_symbol_tx=character(), distance=numeric(), lineage=logical())
+
+	# create the output dataset -- empty dataset to append
+	#outputDT <- data.table(appl_id=numeric(0), full_symbol_tx=character(0),create_user_id=character(0),allocation_type=character(0), c_star=character(0), source=character(0), nsource=numeric(0), index=numeric(0), distance=numeric(0),lineage=logical(0))
+
+	
+	#d[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d[source=="OTHER",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+	#d[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d[source=="MACHINE",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+
+	# create a list of application numbers that and loop through list
+	# using data.table speed
+	appl_list <- unique(d[,appl_id])
+
+	# create filename with current date
+	currentTime <- Sys.time()
+	filename <- paste("C:\\Files\\Inbox\\R Output Files\\distance_function_int_dataset_",format(currentTime,"%Y%m%d_%H%M%S"),".csv",sep="")
+	logfile <- paste("C:\\Files\\Inbox\\R Output Files\\distance_log_",format(currentTime,"%Y%m%d_%H%M%S"),".txt",sep="")
+
+	# get start time
+	start_time <- Sys.time()
+	# print system message
+	print(paste("Beginning distance function at:",start_time))
+	Sys.sleep(0.01)
+	flush.console()
+	n <- 1
+	sink(logfile, append=TRUE)
+	# loop through each application
+	outputDT <- rbindlist(
+	foreach(i=1:length(appl_list)) %dopar% {
+	#for (id in appl_list) {
+		# get data for one application
+		#d.one_application <- d[appl_id==id]
+		d.one_application <- d[appl_id==appl_list[i]]
+
+		# get min distance and lineage for each direction
+		# machine -> other
+		# other -> machine
+		d.one_application[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="OTHER",full_symbol_tx],i),by=list(full_symbol_tx)]
+		d.one_application[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="MACHINE",full_symbol_tx],i),by=list(full_symbol_tx)]
+		# write each iteration in case of system failure
+		write.table(d.one_application, filename, sep = ",", col.names = !file.exists(filename), append = T,row.names=FALSE)
+		# append to output dataset
+		#outputDT <- rbind(outputDT, d.one_application)
+
+		# print progress to file
+		#n <- n + 1
+		#cat(paste("Iteration:",i,Sys.time(),appl_id))
+		#Sys.sleep(0.01)
+		#flush.console()
+	}
+	) # end rbindlist call
+	# get end time
+	sink()
+	end_time <- Sys.time()
+	# print system messages
+	print(paste("Finished at:",end_time))
+	print(paste("Total time:",end_time-start_time))
+
+
+
+	
+
+	#return(d.distance)
+	return(outputDT)
+}
+
 
 # function to get minimum distance and lineage
 # between a symbol and a list of symbols
-getMinDistanceLineage <- function(symbol,symbol_set) {
-
+getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 	# define a data.table to hold all distance and lineage
 	outer_symbol_distance <- data.table(distance=numeric(0),lineage=logical(0))
+	#print(paste("Current symbol:",symbol))
+	#print("Outer Symbol Matrix initialized")
+	#print(outer_symbol_distance)
+	#Sys.sleep(0.01)
+	#flush.console()
 
 	min_distance <- 0
 	min_lineage <- FALSE
 
 	for(i in 1:length(symbol_set)) {
-		# print(paste("Iteration: ",i, ", ss1, Inner: ", l))
+		#print(paste("Iteration: ",i, ", ss1, Inner: ", l))
+		#print(paste("Beginning Loop:",i))
 		# # flush console
-		# Sys.sleep(0.01)
-		# flush.console()
+		#Sys.sleep(0.01)
+		#flush.console()
 
 		if(symbol == symbol_set[i]) {
 			#print(paste("Iteration: ",i, ", ss1, Inner: ", l))
 			# flush console
-			# Sys.sleep(0.01)
-			# flush.console()
-			# print(paste("Iteration:",i, "Skipping: Same Symbol Found",symbol,symbol_set[i],"distance: 0"))
-			# Sys.sleep(0.01)
-			# flush.console()
-			outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(0,TRUE)), use.names=FALSE)
+			#Sys.sleep(0.01)
+			#flush.console()
+			#print(paste("Iteration:",i, "Skipping: Same Symbol Found",symbol,symbol_set[i],"distance: 0"))
+			#Sys.sleep(0.01)
+			#flush.console()
+			#outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(0,TRUE)), use.names=FALSE)
 
 			# if the symbols match, then no need to continue
-			break
+			#break
+			return(list(min_distance=0, min_lineage=TRUE))
 		
 		} else {
 			temp_distance <- getSymbolDistance(symbol, symbol_set[i])
+			# print this out
+			#print(paste("distance:",temp_distance$distance,"lineage:",temp_distance$lineage))
+			#Sys.sleep(0.01)
+			#flush.console()
 			
 			# also get the number of rows currently in 
 			# outer_symbol_distance
 			outer_symbol_distance.nrow <- nrow(outer_symbol_distance)
-
+			#print(paste("outer_symbol_distance nrow =",outer_symbol_distance.nrow))
+			#Sys.sleep(0.01)
+			#flush.console()
 			# if this is the first symbol being evaluated, can't
 			# compare to previous symbol
-			if(outer_symbol_distance.nrow>1) {
+			if(outer_symbol_distance.nrow<1) {
+
+				#print(paste("Iteration:",i,symbol,symbol_set[i],"distance:",temp_distance$distance))
+			 	#Sys.sleep(0.01)
+				#flush.console()
+				outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage)), use.names=FALSE)
+
+				
+
+			} else {
+				#print("outer_symbol_distance >= 1")
+				#Sys.sleep(0.01)
+				#flush.console()
+
+				# two main cases
+				# the previous row has lineage == TRUE or FALSE
+
+				if(outer_symbol_distance[outer_symbol_distance.nrow,lineage]==TRUE) {
+
+					#print("previous row lineage == TRUE")
+					#Sys.sleep(0.01)
+					#flush.console()
+
+					# now, if current row has lineage == FALSE or distance is >= previous row, skip it
+					if(temp_distance$lineage==FALSE | temp_distance$distance>=outer_symbol_distance[outer_symbol_distance.nrow,distance]) {
+						#print("current lineage == FALSE or current distance >= previous distance")
+						#Sys.sleep(0.01)
+						#flush.console()
+						next
+					# if not, that means current distance is less than
+					# previous and current lineage is TRUE
+					# can replace previous with current
+					} else {
+						#print("current distance < previous and current lineage == TRUE")
+						#print("Removing previous row")
+						#Sys.sleep(0.01)
+						#flush.console()
+						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage)
+					}
+
+				# if not, previous row lineage == FALSE
+				} else {
+					#print("previous row lineage == FALSE")
+					#Sys.sleep(0.01)
+					#flush.console()
+
+					# if current row lineage is TRUE or distance is < 
+					# previous row, replace previous row
+					if(temp_distance$lineage==TRUE | temp_distance$distance<outer_symbol_distance[outer_symbol_distance.nrow,distance]) {
+						#print("current lineage == TRUE or current distance < previous distance")
+						#print("Removing previous row")
+						#Sys.sleep(0.01)
+						#flush.console()
+						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage)
+
+					# if not, skip
+					} else {
+						#print("current distance >= previous distance and current lineage == FALSE")
+						#Sys.sleep(0.01)
+						#flush.console()
+						next
+					}
+
+				}
+
 
 				# if the distance is bigger than the previous 
 				# distance, no need to write it
-				if (temp_distance$distance>=outer_symbol_distance[outer_symbol_distance.nrow-1,distance]&temp_distance$lineage==FALSE) {
+				#if (temp_distance$distance>=outer_symbol_distance[outer_symbol_distance.nrow-1,distance]&temp_distance$lineage==FALSE) {
 					# print(paste("Iteration:",i,symbol,symbol_set[i],"distance:",temp_distance$distance))
 					# Sys.sleep(0.01)
 					# flush.console()
 					#print("Skipping: Current Distance > Previous Distance")
-					next
+				#	next
 
-				} else {
+				#} else if(temp_distance$distance<outer_symbol_distance[outer_symbol_distance.nrow-1,distance]&temp_distance$lineage==FALSE) {
+
+
+
+
+				#}else {
 			# 		print(paste("Iteration:",i,symbol,symbol_set[i],"distance:",temp_distance$distance))
 			# 		Sys.sleep(0.01)
 			# flush.console()
-					outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage)), use.names=FALSE)
-				}
-
-			} else {
-			# 	print(paste("Iteration:",i,symbol,symbol_set[i],"distance:",temp_distance$distance))
-			# 	Sys.sleep(0.01)
-			# flush.console()
-				outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage)), use.names=FALSE)
+				#	outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage)), use.names=FALSE)
+				#}
+			 	
 			}
 		}
 
 	}
 
-	# do some logic to get the closest distance
-	
-	if(length(which(outer_symbol_distance$lineage==1)) >= 1) {
-		
-		t <- which(outer_symbol_distance$lineage==1)
-		min_distance <- min(outer_symbol_distance$distance[t])
-		min_lineage <- TRUE
-		
-		#d.distance <- rbindlist(list(d.distance, list(min_distance,TRUE)), use.names=FALSE)
-	} else {
-		
-		min_distance <- min(outer_symbol_distance$distance)
-		
-		#d.distance <- rbindlist(list(d.distance, list(min_distance,FALSE)), use.names=FALSE)
-	}
+	# at this point, the outer_symbol_distance matrix should
+	# only have one row, which SHOULD be the minimum
 
+	#print(paste("Finished outer loop for symbol",symbol))
+	#print(outer_symbol_distance)
+	#print(class(outer_symbol_distance$distance))
+	#print(class(outer_symbol_distance$lineage))
+
+
+	# # do some logic to get the closest distance
+	
+	# if(length(which(outer_symbol_distance$lineage==1)) >= 1) {
+		
+	# 	t <- which(outer_symbol_distance$lineage==1)
+	# 	min_distance <- min(outer_symbol_distance$distance[t])
+	# 	min_lineage <- TRUE
+		
+	# 	#d.distance <- rbindlist(list(d.distance, list(min_distance,TRUE)), use.names=FALSE)
+	# } else {
+		
+	# 	min_distance <- min(outer_symbol_distance$distance)
+		
+	# 	#d.distance <- rbindlist(list(d.distance, list(min_distance,FALSE)), use.names=FALSE)
+	# }
+
+	# if((i%%20)==0){
+	 print(paste("Iteration:",counter,Sys.time(),appl_id, "Index:", index, symbol))
+	# Sys.sleep(0.01)
+	# flush.console()
+	# }
 	# now return min_distance and min_lineage
-	return(list(min_distance=min_distance, min_lineage=min_lineage))
+	#return(list(min_distance=min_distance, min_lineage=min_lineage))
+	return(list(min_distance=outer_symbol_distance$distance, min_lineage=outer_symbol_distance$lineage))
 	
 	
 
