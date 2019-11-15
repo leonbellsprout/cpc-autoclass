@@ -342,6 +342,10 @@ getDistanceDTNew <- function(d) {
 	filename <- paste("C:\\Files\\Inbox\\R Output Files\\distance_function_int_dataset_",format(currentTime,"%Y%m%d_%H%M%S"),".csv",sep="")
 	logfile <- paste("C:\\Files\\Inbox\\R Output Files\\distance_log_",format(currentTime,"%Y%m%d_%H%M%S"),".txt",sep="")
 
+	# need to get both sources from data so they aren't hard coded
+	source1 <- unique(d[,source])[1]
+	source2 <- unique(d[,source])[2]
+
 	# get start time
 	start_time <- Sys.time()
 	# print system message
@@ -361,8 +365,8 @@ getDistanceDTNew <- function(d) {
 		# get min distance and lineage for each direction
 		# machine -> other
 		# other -> machine
-		d.one_application[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="OTHER",full_symbol_tx],i),by=list(full_symbol_tx)]
-		d.one_application[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source=="MACHINE",full_symbol_tx],i),by=list(full_symbol_tx)]
+		d.one_application[source==source2,c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source1,full_symbol_tx],i),by=list(full_symbol_tx)]
+		d.one_application[source==source1,c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source2,full_symbol_tx],i),by=list(full_symbol_tx)]
 		# write each iteration in case of system failure
 		write.table(d.one_application, filename, sep = ",", col.names = !file.exists(filename), append = T,row.names=FALSE)
 		# append to output dataset
@@ -571,7 +575,55 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 
 }
 		
-			
+getCountMatch <- function(appl_id, index, symbol, symbol_set,counter) {
+	# define a data.table to hold all distance and lineage
+	#outer_symbol_distance <- data.table(distance=numeric(0),lineage=logical(0))
+	#print(paste("Current symbol:",symbol))
+	#print("Outer Symbol Matrix initialized")
+	#print(outer_symbol_distance)
+	#Sys.sleep(0.01)
+	#flush.console()
+
+	#min_distance <- 0
+	#min_lineage <- FALSE
+
+	match <- 0
+	match_subcls <- 0
+	match_maingrp <- 0
+
+	# loop through symbol set to find matches
+	# if a match is found, updated match variables 
+	# and exit loop
+	for(i in 1:length(symbol_set)) {
+	
+		if(symbol==symbol_set[i]) {
+			match <- 1
+			match_maingrp <- 1
+			match_subcls <- 1
+			break
+		} else if(gsub('/.*',"",symbol)==gsub('/.*',"",symbol_set[i])) {
+			match_maingrp <- 1
+			match_subcls <- 1
+			#break
+		} else if(substr(symbol,1,4)==substr(symbol_set[i],1,4)) {
+			match_subcls <- 1
+			#break
+		}
+
+			 	
+	}
+		
+
+	
+	print(paste("Iteration:",counter,Sys.time(),appl_id, "Index:", index, symbol))
+	
+
+	#return(list(min_distance=min_distance, min_lineage=min_lineage))
+	return(list(match=match, match_subcls=match_subcls, match_maingrp=match_maingrp))
+	
+	
+
+}			
 
 			
 				
