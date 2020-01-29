@@ -54,63 +54,47 @@ d.parents$PARENTS_NO_SPACE <- gsub(" ", "", d.parents$parents, fixed = TRUE)
 # Read in the data
 # this needs to have the following columns: application id, cpc code, create user id, allocation type, and c-star indicator
 # in that order, but not necessarily named the same 
+#
+# Note: if data comes from machine in multiple files, 
+# use function catCPCFiles to read in
+#
+#
 filename <- file.choose()
 d.same <- data.table(read.csv(filename))
 
 # this dataset has one cpc code from each application id
 # remove these if this is the case and combine with 2nd dataset
-d.same <- d.same[Create.User.Id=="MACHINE"]
+#d.same <- d.same[Create.User.Id=="MACHINE"]
 
 # if combining datasets, do so here
-filename2 <- file.choose()
-d.same2 <- data.table(read.csv(filename2, header=FALSE))
+#filename2 <- file.choose()
+#d.same2 <- data.table(read.csv(filename2, header=FALSE))
 
 d.same
-d.same2
+#d.same2
+
+# read in using catCPCFiles function
+d.same <- catCPCFiles()
+d.same
+
 
 # rename columns 
-names(d.same) <- c("appl_id", "full_symbol_tx", "create_user_id", "allocation_type", "c_star")
-names(d.same2) <- c("appl_id", "create_user_id", "full_symbol_tx", "allocation_type", "c_star")
+# this is done in the preprocessCPC function
+# added "score" to names
+#names(d.same) <- c("appl_id", "full_symbol_tx", "create_user_id", "allocation_type", "c_star","score")
+#names(d.same2) <- c("appl_id", "create_user_id", "full_symbol_tx", "allocation_type", "c_star","score")
 
-d.same <- rbind(d.same,d.same2)
+# only run this line if combining two datasets
+#d.same <- rbind(d.same,d.same2)
 
-# strip whitespace from symbol text
-d.same[,full_symbol_tx := as.character(full_symbol_tx)]
-d.same[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
-d.same[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
-d.same[,create_user_id := as.character(create_user_id)]
-
-# get rid of create_user_id == "CO-OWN-BACKFILE"
-d.same <- d.same[create_user_id!="CO-OWN-BACKFILE"]
-
-# get rid of Y symbols
-d.same <- d.same[substring(full_symbol_tx,1,1)!="Y"]
-
-# create a new column which will create two sources from multiple (as long as one is named "MACHINE")
-d.same[,source := sapply(create_user_id, function(x) if (x=="MACHINE") {"MACHINE"} else {"OTHER"})]
-
-# get rid of applications with < 2 sources
-d.same<-d.same[,nsource:=length(unique(source)),by=appl_id][nsource>1]
-
-# machine is predicting subclass... get rid of any machine symbols 
-# that aren't the full symbol
-# machine predicted around 4300 symbols that aren't full symbols
-d.same <- d.same[grep('/',full_symbol_tx)]
-
-# sort dataset by application id, source, cpc code
-d.same <- d.same[order(appl_id, source, full_symbol_tx)]
-
-# this dataset has a bunch of dups -- remove them!
-d.same <- unique(d.same, by=c("appl_id", "source", "full_symbol_tx"))
-
-# add application index for keeping track in loop
-d.same[,index:=1:.N]
+# run this line to preprocess cpc data 
+d.same <- preprocessCPC(d.same)
 
 # examine dataset
 d.same
 
 unique(d.same[,appl_id])[1:20]
-d.same[appl_id==13512421]
+d.same[appl_id==14153033]
 
 #d.same[source=="OTHER"]
 
@@ -119,8 +103,12 @@ d.same[appl_id==13512421]
 # before you get back and the computer restartsssss
 # you must have the directory created
 #start_time <- Sys.time()
+
+# write out dataset to share
+write.csv(d.same,"C:\\Files\\Inbox\\R Output Files\\CPC random sample preprocessed 20191231.csv",row.names=FALSE)
+
 d.output <- getDistanceDTNew(d.same) # took 8.5 hours for ~2000 apps
-;#end_time <- Sys.time()
+#end_time <- Sys.time()
 #d.output <- cbind(d.same, d.distance.output) 
 currentDate <- Sys.Date()
 filename <- paste("C:\\Files\\Inbox\\R Output Files\\rand_samp_distance_",currentDate,".csv",sep="")
@@ -197,8 +185,8 @@ twenty_apps <- unique(d.same[,appl_id])[1:20]
 d.20apps <- d.same[appl_id%in%twenty_apps]
 
 start_time <- Sys.time()
-d.20apps[source=="MACHINE",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.20apps[source=="OTHER",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
-d.20apps[source=="OTHER",c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.20apps[source=="MACHINE",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+d.20apps[source=="MACHINE",c("distance","lineage","n_common_anc"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.20apps[source=="OTHER",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
+d.20apps[source=="OTHER",c("distance","lineage","n_common_anc"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.20apps[source=="MACHINE",full_symbol_tx]),by=list(appl_id,full_symbol_tx)]
 end_time <- Sys.time()
 print(end_time-start_time)
 d.20apps[appl_id==13512421]
@@ -233,15 +221,4 @@ start_time <- Sys.time()
 	)
 
 
-#myFun2(d.same)
-#stopCluster(cl)
-outputDT
-end_time <- Sys.time()
-print(end_time-start_time)
 
-cl <- makeCluster(2)
-registerDoSNOW(cl)
-foreach(i = 1:3, .combine = 'c') %dopar% {
-  sqrt(i)
-}
-stopCluster(cl)

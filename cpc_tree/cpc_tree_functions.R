@@ -196,7 +196,7 @@ getSymbolDistance <- function(symbol1, symbol2) {
 getDistanceDT <- function(d) {
 	#require(svMisc)
 	# create an empty data frame to hold distance and lineage values	
-	d.distance <- data.table(appl_id=numeric(), source=character(),full_symbol_tx=character(), distance=numeric(), lineage=logical())
+	d.distance <- data.table(appl_id=numeric(), source=character(),full_symbol_tx=character(), distance=numeric(), lineage=logical(), n_common_anc=numeric())
 
 	# make sure d has only 2 unique sources
 	if(length(unique(d[,source]))!=2) {
@@ -365,8 +365,8 @@ getDistanceDTNew <- function(d) {
 		# get min distance and lineage for each direction
 		# machine -> other
 		# other -> machine
-		d.one_application[source==source2,c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source1,full_symbol_tx],i),by=list(full_symbol_tx)]
-		d.one_application[source==source1,c("distance","lineage"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source2,full_symbol_tx],i),by=list(full_symbol_tx)]
+		d.one_application[source==source2,c("distance","lineage","n_common_anc"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source1,full_symbol_tx],i),by=list(full_symbol_tx)]
+		d.one_application[source==source1,c("distance","lineage","n_common_anc"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source2,full_symbol_tx],i),by=list(full_symbol_tx)]
 		# write each iteration in case of system failure
 		write.table(d.one_application, filename, sep = ",", col.names = !file.exists(filename), append = T,row.names=FALSE)
 		# append to output dataset
@@ -399,7 +399,7 @@ getDistanceDTNew <- function(d) {
 # between a symbol and a list of symbols
 getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 	# define a data.table to hold all distance and lineage
-	outer_symbol_distance <- data.table(distance=numeric(0),lineage=logical(0))
+	outer_symbol_distance <- data.table(distance=numeric(0),lineage=logical(0),n_common_anc=numeric(0))
 	#print(paste("Current symbol:",symbol))
 	#print("Outer Symbol Matrix initialized")
 	#print(outer_symbol_distance)
@@ -428,7 +428,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 
 			# if the symbols match, then no need to continue
 			#break
-			return(list(min_distance=0, min_lineage=TRUE))
+			return(list(min_distance=0, min_lineage=TRUE,n_common_anc=0))
 		
 		} else {
 			temp_distance <- getSymbolDistance(symbol, symbol_set[i])
@@ -450,7 +450,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 				#print(paste("Iteration:",i,symbol,symbol_set[i],"distance:",temp_distance$distance))
 			 	#Sys.sleep(0.01)
 				#flush.console()
-				outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage)), use.names=FALSE)
+				outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage,length(temp_distance$commonParents))), use.names=FALSE)
 
 				
 
@@ -482,7 +482,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 						#print("Removing previous row")
 						#Sys.sleep(0.01)
 						#flush.console()
-						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage)
+						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage,n_common_anc=length(temp_distance$commonParents))
 					}
 
 				# if not, previous row lineage == FALSE
@@ -498,7 +498,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 						#print("Removing previous row")
 						#Sys.sleep(0.01)
 						#flush.console()
-						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage)
+						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage,n_common_anc=length(temp_distance$commonParents))
 
 					# if not, skip
 					} else {
@@ -569,7 +569,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 	# }
 	# now return min_distance and min_lineage
 	#return(list(min_distance=min_distance, min_lineage=min_lineage))
-	return(list(min_distance=outer_symbol_distance$distance, min_lineage=outer_symbol_distance$lineage))
+	return(list(min_distance=outer_symbol_distance$distance, min_lineage=outer_symbol_distance$lineage,n_common_anc=outer_symbol_distance$n_common_anc))
 	
 	
 
@@ -625,8 +625,89 @@ getCountMatch <- function(appl_id, index, symbol, symbol_set,counter) {
 
 }			
 
-			
-				
+# function to concatenate files
+catCPCFiles <- function() {
+# load libraries
+	require(tcltk2)
+	require(data.table)
 
-				
-		
+	# choose filenames
+	filenames <- tk_choose.files()
+
+	# create empty data.table
+	data.machine <- data.table()
+	data.contractor <- data.table()
+
+	for(filename in filenames) {
+
+		if(grepl("contractor", filename)) {
+			data.contractor <- rbind(data.contractor, as.data.table(read.csv(filename)))
+		} else if(grepl("machine", filename)) {
+			data.machine <- rbind(data.machine, as.data.table(read.csv(filename)))
+		}
+	}
+
+	data.machine[,Create.User.Id:="MACHINE"]
+	data.machine[,Allocation.Type.Code:=NA]
+	data.machine[,C.Star.Indicator:=NA]
+	data.contractor[,Algorithm.Score:=1]
+
+	# combine machine and contractor data
+	return(rbind(data.machine[,list(Application.Number,Cpc.Code,Create.User.Id,Allocation.Type.Code,C.Star.Indicator,Algorithm.Score)],data.contractor[,list(Application.Number,Cpc.Code,Create.User.Id,Allocation.Type.Code,C.Star.Indicator,Algorithm.Score)]))
+
+# end function
+}
+
+# function to preprocess cpc data
+preprocessCPC <- function(data) {
+	# rename columns
+	names(data) <- c("appl_id", "full_symbol_tx", "create_user_id", "allocation_type", "c_star","score")
+
+	# strip whitespace from symbol text
+	data[,full_symbol_tx := as.character(full_symbol_tx)]
+	data[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
+	data[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
+	data[,create_user_id := as.character(create_user_id)]
+
+	n1 <- nrow(data)
+	# get rid of create_user_id == "CO-OWN-BACKFILE"
+	data <- data[create_user_id!="CO-OWN-BACKFILE"]
+
+	print(paste("There were",n1-nrow(data),"with CO-OWN-BACKFILE as create_user_id removed."))
+
+	n1 <- nrow(data)
+	# get rid of Y symbols
+	data <- data[substring(full_symbol_tx,1,1)!="Y"]
+	print(paste("There were",n1-nrow(data),"Y symbols removed."))
+
+	# create a new column which will create two sources from multiple (as long as one is named "MACHINE")
+	data[,source := sapply(create_user_id, function(x) if (x=="MACHINE") {"MACHINE"} else {"OTHER"})]
+
+	n1 <- nrow(data)
+	# get rid of applications with < 2 sources
+	data<-data[,nsource:=length(unique(source)),by=appl_id][nsource>1]
+	print(paste("There were",n1-nrow(data),"rows removed due to application only having one source."))	
+
+	# machine is predicting subclass... get rid of any machine symbols 
+	# that aren't the full symbol
+	# machine predicted around 4300 symbols that aren't full symbols
+	data <- data[grep('/',full_symbol_tx)]
+
+	# sort dataset by application id, source, cpc code
+	data <- data[order(appl_id, source, full_symbol_tx)]
+
+	n1 <- nrow(data)
+	# this dataset has a bunch of dups -- remove them!
+	data <- unique(data, by=c("appl_id", "source", "full_symbol_tx"))
+	print(paste("There were",n1-nrow(data),"duplicates removed."))
+
+	# add application index for keeping track in loop
+	data[,index:=1:.N]
+
+	# this line is used to fix an error when printing 
+	# the data.table after function call ends
+	data[]
+
+	# return data
+	return(data)
+}
