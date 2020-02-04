@@ -94,7 +94,9 @@ d.same <- preprocessCPC(d.same)
 d.same
 
 unique(d.same[,appl_id])[1:20]
-d.same[appl_id==14153033]
+
+# use the following for testing functions on one application (or on a list thereof)
+#d.same <- d.same[appl_id==15304390]
 
 #d.same[source=="OTHER"]
 

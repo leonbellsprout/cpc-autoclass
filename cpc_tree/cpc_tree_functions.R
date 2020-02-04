@@ -190,137 +190,139 @@ getSymbolDistance <- function(symbol1, symbol2) {
 
 #
 # write function to return distance matrixy thingy
+# Commenting this out for new one below
 #
 
 
-getDistanceDT <- function(d) {
-	#require(svMisc)
-	# create an empty data frame to hold distance and lineage values	
-	d.distance <- data.table(appl_id=numeric(), source=character(),full_symbol_tx=character(), distance=numeric(), lineage=logical(), n_common_anc=numeric())
+# getDistanceDT <- function(d) {
+# 	#require(svMisc)
+# 	# create an empty data frame to hold distance and lineage values	
+# 	d.distance <- data.table(appl_id=numeric(), source=character(),full_symbol_tx=character(), distance=numeric(), lineage=logical(), n_common_anc=numeric())
 
-	# make sure d has only 2 unique sources
-	if(length(unique(d[,source]))!=2) {
-		print("ERROR: There were not exactly 2 sources")
-		# flush console
-		Sys.sleep(0.01)
-		flush.console()
-		return
-	}
+# 	# make sure d has only 2 unique sources
+# 	if(length(unique(d[,source]))!=2) {
+# 		print("ERROR: There were not exactly 2 sources")
+# 		# flush console
+# 		Sys.sleep(0.01)
+# 		flush.console()
+# 		return
+# 	}
 
-	# make sure symbols have no spaces
-	d[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
-	d[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
+# 	# make sure symbols have no spaces
+# 	d[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
+# 	d[,full_symbol_tx := gsub(" ", "", full_symbol_tx)]
 
-	# make sure dataset it sorted
-	#d <- d[order(appl_id, source, full_symbol_tx)]
+# 	# make sure dataset it sorted
+# 	#d <- d[order(appl_id, source, full_symbol_tx)]
 
-	# create list of applications
-	appl_list <- unique(d[,appl_id])
-	counter <- 1
+# 	# create list of applications
+# 	appl_list <- unique(d[,appl_id])
+# 	counter <- 1
 	
-	for(i in 1:length(appl_list)) {
-		print(paste("Counter:", counter))
-		print(paste("Iteration:",i, "Application:",appl_list[i]))
-		# flush console
-		Sys.sleep(0.01)
-		flush.console()
-		# get data for just one application
-		d.one_application <- d[appl_id==appl_list[i],]
-		# get the different user names (should only be 2 (for now))
-		user_list <- unique(d.one_application[,source])
-		# get the symbols for each user name
-		symbol_set_1 <- d.one_application[source==user_list[1],full_symbol_tx]
-		symbol_set_2 <- d.one_application[source==user_list[2],full_symbol_tx]
+# 	for(i in 1:length(appl_list)) {
+# 		print(paste("Counter:", counter))
+# 		print(paste("Iteration:",i, "Application:",appl_list[i]))
+# 		# flush console
+# 		Sys.sleep(0.01)
+# 		flush.console()
+# 		# get data for just one application
+# 		d.one_application <- d[appl_id==appl_list[i],]
+# 		# get the different user names (should only be 2 (for now))
+# 		user_list <- unique(d.one_application[,source])
+# 		# get the symbols for each user name
+# 		symbol_set_1 <- d.one_application[source==user_list[1],full_symbol_tx]
+# 		symbol_set_2 <- d.one_application[source==user_list[2],full_symbol_tx]
 
-		# if one of the symbol sets is empty, e.g., no data
-		# from one of the two sources, need to skip iteration
-		if(length(symbol_set_1) == 0 | length(symbol_set_2)==0) {
+# 		# if one of the symbol sets is empty, e.g., no data
+# 		# from one of the two sources, need to skip iteration
+# 		if(length(symbol_set_1) == 0 | length(symbol_set_2)==0) {
 			
-			# create a sequence for all the counter values that will be
-			# set to null in d.distance
-			#counter_seq <- seq(counter,counter+max(length(symbol_set_1),length(symbol_set_2)),by=1)
-			counter_seq <- max(length(symbol_set_1),length(symbol_set_2))
+# 			# create a sequence for all the counter values that will be
+# 			# set to null in d.distance
+# 			#counter_seq <- seq(counter,counter+max(length(symbol_set_1),length(symbol_set_2)),by=1)
+# 			counter_seq <- max(length(symbol_set_1),length(symbol_set_2))
 
-			# set d.distance = null for those symbols
-			#d.distance[counter_seq,c("distance","lineage") := list(NA,NA)]
-			src <- "MACHINE"
-			symbols <- symbol_set_1
-			if (length(symbol_set_1)==0) {
-				src <- "OTHER"
-				symbols <- symbol_set_2
-			} 
+# 			# set d.distance = null for those symbols
+# 			#d.distance[counter_seq,c("distance","lineage") := list(NA,NA)]
+# 			src <- "MACHINE"
+# 			symbols <- symbol_set_1
+# 			if (length(symbol_set_1)==0) {
+# 				src <- "OTHER"
+# 				symbols <- symbol_set_2
+# 			} 
 
-			d.distance <- rbindlist(list(d.distance, list(rep(appl_list[i],counter_seq),rep(src,counter_seq),symbols,rep(NA,counter_seq),rep(FALSE,counter_seq))), use.names=FALSE)
+# 			d.distance <- rbindlist(list(d.distance, list(rep(appl_list[i],counter_seq),rep(src,counter_seq),symbols,rep(NA,counter_seq),rep(FALSE,counter_seq))), use.names=FALSE)
 			
-			# update counter variable
-			counter <- counter + counter_seq #+ 1
+# 			# update counter variable
+# 			counter <- counter + counter_seq #+ 1
 
-			# print out warning message
-			print(paste("Skipping ", counter_seq, " symbols for ", appl_list[i]))
+# 			# print out warning message
+# 			print(paste("Skipping ", counter_seq, " symbols for ", appl_list[i]))
 
-			# flush console
-			Sys.sleep(0.01)
-			flush.console()
-			# skip to next iteration
-			next
-		}
+# 			# flush console
+# 			Sys.sleep(0.01)
+# 			flush.console()
+# 			# skip to next iteration
+# 			next
+# 		}
 
-		# nested loop and get distance and lineage for each symbol pair
-		# for MACHINE source
-		for(k in 1:length(symbol_set_1)) {
-			#print(paste("Iteration: ",i, ", ss1, Outer: ", k))
-			# flush console
-			#Sys.sleep(0.01)
-			#flush.console()
+# 		# nested loop and get distance and lineage for each symbol pair
+# 		# for MACHINE source
+# 		for(k in 1:length(symbol_set_1)) {
+# 			#print(paste("Iteration: ",i, ", ss1, Outer: ", k))
+# 			# flush console
+# 			#Sys.sleep(0.01)
+# 			#flush.console()
 
-			# call getMinDistanceLineage to get the minimum distance
-			# for each symbol in symbol_set_1 compared to symbol_set_2
-			#
-			# function returns a list to update d.distance
-			min_distance_lineage <- getMinDistanceLineage(symbol_set_1[k],symbol_set_2)
+# 			# call getMinDistanceLineage to get the minimum distance
+# 			# for each symbol in symbol_set_1 compared to symbol_set_2
+# 			#
+# 			# function returns a list to update d.distance
+# 			min_distance_lineage <- getMinDistanceLineage(symbol_set_1[k],symbol_set_2)
 
-			#print(paste("Application:",appl_list[i],"Source: MACHINE","Symbol",symbol_set_1[k],"Min Distance:",min_distance_lineage$min_distance,"Lineage:",min_distance_lineage$min_lineage))
+# 			#print(paste("Application:",appl_list[i],"Source: MACHINE","Symbol",symbol_set_1[k],"Min Distance:",min_distance_lineage$min_distance,"Lineage:",min_distance_lineage$min_lineage))
 
-			d.distance <- rbindlist(list(d.distance, list(appl_list[i],"MACHINE",symbol_set_1[k],min_distance_lineage$min_distance,min_distance_lineage$min_lineage)), use.names=FALSE)
-
-			
-
-			counter <- counter+1
-		}
-
-		# same for OTHER source
-		for(k in 1:length(symbol_set_2)) {
-			#print(paste("Iteration: ",i, ", ss2, Outer: ", k))
-			# flush console
-			#Sys.sleep(0.01)
-			#flush.console()
-
-			# call getMinDistanceLineage to get the minimum distance
-			# for each symbol in symbol_set_1 compared to symbol_set_2
-			#
-			# function returns a list to update d.distance
-			min_distance_lineage <- getMinDistanceLineage(symbol_set_2[k],symbol_set_1)
-
-			#print(paste("Application:",appl_list[i],"Source: OTHER","Symbol",symbol_set_2[k],"Min Distance:",min_distance_lineage$min_distance,"Lineage:",min_distance_lineage$min_lineage))
-
-			#d.distance <- rbindlist(list(d.distance, min_distance_lineage), use.names=FALSE)
-			d.distance <- rbindlist(list(d.distance, list(appl_list[i],"OTHER",symbol_set_2[k],min_distance_lineage$min_distance,min_distance_lineage$min_lineage)), use.names=FALSE)
+# 			d.distance <- rbindlist(list(d.distance, list(appl_list[i],"MACHINE",symbol_set_1[k],min_distance_lineage$min_distance,min_distance_lineage$min_lineage)), use.names=FALSE)
 
 			
 
-			counter <- counter+1
-		}
+# 			counter <- counter+1
+# 		}
 
-		# flush console
-		#Sys.sleep(0.01)
-		#flush.console()
+# 		# same for OTHER source
+# 		for(k in 1:length(symbol_set_2)) {
+# 			#print(paste("Iteration: ",i, ", ss2, Outer: ", k))
+# 			# flush console
+# 			#Sys.sleep(0.01)
+# 			#flush.console()
 
-	}
+# 			# call getMinDistanceLineage to get the minimum distance
+# 			# for each symbol in symbol_set_1 compared to symbol_set_2
+# 			#
+# 			# function returns a list to update d.distance
+# 			min_distance_lineage <- getMinDistanceLineage(symbol_set_2[k],symbol_set_1)
 
-	return(d.distance)
-}
+# 			#print(paste("Application:",appl_list[i],"Source: OTHER","Symbol",symbol_set_2[k],"Min Distance:",min_distance_lineage$min_distance,"Lineage:",min_distance_lineage$min_lineage))
+
+# 			#d.distance <- rbindlist(list(d.distance, min_distance_lineage), use.names=FALSE)
+# 			d.distance <- rbindlist(list(d.distance, list(appl_list[i],"OTHER",symbol_set_2[k],min_distance_lineage$min_distance,min_distance_lineage$min_lineage)), use.names=FALSE)
+
+			
+
+# 			counter <- counter+1
+# 		}
+
+# 		# flush console
+# 		#Sys.sleep(0.01)
+# 		#flush.console()
+
+# 	}
+
+# 	return(d.distance)
+# }
 
 # create a more efficient version
+# use this one
 getDistanceDTNew <- function(d) {
 	#require(svMisc)
 	# create an empty data frame to hold distance and lineage values	
@@ -365,8 +367,8 @@ getDistanceDTNew <- function(d) {
 		# get min distance and lineage for each direction
 		# machine -> other
 		# other -> machine
-		d.one_application[source==source2,c("distance","lineage","n_common_anc"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source1,full_symbol_tx],i),by=list(full_symbol_tx)]
-		d.one_application[source==source1,c("distance","lineage","n_common_anc"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source2,full_symbol_tx],i),by=list(full_symbol_tx)]
+		d.one_application[source==source2,c("distance","lineage","n_common_anc","symbol"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source1,full_symbol_tx],i),by=list(full_symbol_tx)]
+		d.one_application[source==source1,c("distance","lineage","n_common_anc","symbol"):=getMinDistanceLineage(appl_id, index, full_symbol_tx,d.one_application[source==source2,full_symbol_tx],i),by=list(full_symbol_tx)]
 		# write each iteration in case of system failure
 		write.table(d.one_application, filename, sep = ",", col.names = !file.exists(filename), append = T,row.names=FALSE)
 		# append to output dataset
@@ -399,7 +401,8 @@ getDistanceDTNew <- function(d) {
 # between a symbol and a list of symbols
 getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 	# define a data.table to hold all distance and lineage
-	outer_symbol_distance <- data.table(distance=numeric(0),lineage=logical(0),n_common_anc=numeric(0))
+	# edit 2/4/2020: return symbol with minimum distance
+	outer_symbol_distance <- data.table(distance=numeric(0),lineage=logical(0),n_common_anc=numeric(0), symbol=character(0))
 	#print(paste("Current symbol:",symbol))
 	#print("Outer Symbol Matrix initialized")
 	#print(outer_symbol_distance)
@@ -408,6 +411,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 
 	min_distance <- 0
 	min_lineage <- FALSE
+	min_symbol <- ""
 
 	for(i in 1:length(symbol_set)) {
 		#print(paste("Iteration: ",i, ", ss1, Inner: ", l))
@@ -428,7 +432,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 
 			# if the symbols match, then no need to continue
 			#break
-			return(list(min_distance=0, min_lineage=TRUE,n_common_anc=0))
+			return(list(min_distance=0, min_lineage=TRUE,n_common_anc=0, min_symbol=symbol))
 		
 		} else {
 			temp_distance <- getSymbolDistance(symbol, symbol_set[i])
@@ -450,7 +454,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 				#print(paste("Iteration:",i,symbol,symbol_set[i],"distance:",temp_distance$distance))
 			 	#Sys.sleep(0.01)
 				#flush.console()
-				outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage,length(temp_distance$commonParents))), use.names=FALSE)
+				outer_symbol_distance <- rbindlist(list(outer_symbol_distance, list(temp_distance$distance,temp_distance$lineage,length(temp_distance$commonParents), symbol_set[i])), use.names=FALSE)
 
 				
 
@@ -482,7 +486,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 						#print("Removing previous row")
 						#Sys.sleep(0.01)
 						#flush.console()
-						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage,n_common_anc=length(temp_distance$commonParents))
+						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage,n_common_anc=length(temp_distance$commonParents),symbol=symbol_set[i])
 					}
 
 				# if not, previous row lineage == FALSE
@@ -498,7 +502,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 						#print("Removing previous row")
 						#Sys.sleep(0.01)
 						#flush.console()
-						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage,n_common_anc=length(temp_distance$commonParents))
+						outer_symbol_distance <- data.table(distance=as.numeric(temp_distance$distance),lineage=temp_distance$lineage,n_common_anc=length(temp_distance$commonParents),symbol=symbol_set[i])
 
 					# if not, skip
 					} else {
@@ -569,7 +573,7 @@ getMinDistanceLineage <- function(appl_id, index, symbol, symbol_set,counter) {
 	# }
 	# now return min_distance and min_lineage
 	#return(list(min_distance=min_distance, min_lineage=min_lineage))
-	return(list(min_distance=outer_symbol_distance$distance, min_lineage=outer_symbol_distance$lineage,n_common_anc=outer_symbol_distance$n_common_anc))
+	return(list(min_distance=outer_symbol_distance$distance, min_lineage=outer_symbol_distance$lineage,n_common_anc=outer_symbol_distance$n_common_anc,min_symbol=outer_symbol_distance$symbol))
 	
 	
 
